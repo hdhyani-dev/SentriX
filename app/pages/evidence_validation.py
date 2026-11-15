@@ -187,6 +187,6 @@ def render_evidence_validation(lab_id: str | None):
                         "Scope Decision": v.scope_decision.upper(),
                         "Result": v.result.upper(),
                         "Reason": v.reason[:70] + "..." if v.reason and len(v.reason) > 70 else (v.reason or "N/A"),
-                        "Timestamp": v.executed_at.strftime("%Y-%m-%d %H:%M:%S UTC") if v.executed_at else "N/A",
+                        "Timestamp": v.created_at.strftime("%Y-%m-%d %H:%M:%S UTC") if getattr(v, "created_at", None) else "N/A",
                     })
                 st.dataframe(pd.DataFrame(v_rows), use_container_width=True)
