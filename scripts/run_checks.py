@@ -22,7 +22,7 @@ from core.ai.base import AIExplanationRequest
 
 def run_checks():
     print("=" * 60)
-    print("  ChainBreak Platform Self-Check & Health Verification")
+    print("  SentriX Platform Self-Check & Health Verification")
     print("=" * 60)
 
     # 1. DB Init

@@ -79,7 +79,7 @@ def test_full_chainbreak_workflow(fresh_session):
 
     # 6. Report generation
     md_report = report_service.generate_report(session, lab_id, format="markdown")
-    assert "# ChainBreak Security Risk-Path Assessment Report" in md_report
+    assert "Security Risk-Path Assessment Report" in md_report
     assert "Weak TLS configuration confirmed" in md_report
 
     html_report = report_service.generate_report(session, lab_id, format="html")

@@ -1,5 +1,5 @@
 """
-ChainBreak — Minimal Working Development Interface (Streamlit)
+SentriX — Minimal Working Development Interface (Streamlit)
 """
 
 import sys
@@ -19,12 +19,12 @@ from core.services.lab_service import lab_service
 init_db()
 
 st.set_page_config(
-    page_title="ChainBreak — Risk Path Analysis",
+    page_title="SentriX — Risk Path Analysis",
     page_icon="🛡️",
     layout="wide",
 )
 
-st.sidebar.title("🛡️ ChainBreak")
+st.sidebar.title("🛡️ SentriX")
 st.sidebar.caption("AI-Assisted Graph-Based Cybersecurity Risk-Path Analysis")
 st.sidebar.markdown("---")
 
@@ -67,7 +67,7 @@ PAGE_ROUTES = {
 choice = st.sidebar.radio("Navigation", list(PAGE_ROUTES.keys()))
 
 st.sidebar.markdown("---")
-st.sidebar.info("⚠️ **Synthetic Simulation**: ChainBreak operates read-only. No offensive actions are executed.")
+st.sidebar.info("⚠️ **Synthetic Simulation**: SentriX operates read-only. No offensive actions are executed.")
 
 # Execute active page renderer
 render_func = PAGE_ROUTES.get(choice)

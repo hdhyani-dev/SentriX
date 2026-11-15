@@ -239,7 +239,7 @@ graph_algorithms = GraphAlgorithms()
 
 if __name__ == "__main__":
     print("=" * 65)
-    print("  ChainBreak — Graph Analysis & Candidate Path Discovery Engine")
+    print("  SentriX — Graph Analysis & Candidate Path Discovery Engine")
     print("=" * 65)
 
     try:

@@ -33,7 +33,7 @@ class MarkdownReportGenerator:
                 pass
 
         lines = [
-            f"# ChainBreak Security Risk-Path Assessment Report",
+            f"# SentriX Security Risk-Path Assessment Report",
             f"",
             f"**Laboratory:** {lab.name}  ",
             f"**Lab ID:** `{lab.id}`  ",

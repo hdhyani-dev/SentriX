@@ -29,7 +29,7 @@ class HTMLReportGenerator:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ChainBreak Report - {lab.name}</title>
+<title>SentriX Report - {lab.name}</title>
 <style>
 body {{
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;

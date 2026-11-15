@@ -1,4 +1,4 @@
-# ChainBreak
+# SentriX
 ## Project README, Product Specification & Antigravity Build Instructions
 
 **Document version:** 1.0  

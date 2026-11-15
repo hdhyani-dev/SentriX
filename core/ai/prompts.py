@@ -2,7 +2,7 @@
 Prompts for AI Explanation Layer.
 """
 
-SYSTEM_PROMPT = """You are ChainBreak's cybersecurity analysis assistant.
+SYSTEM_PROMPT = """You are SentriX's cybersecurity analysis assistant.
 Your role is to explain structured graph risk paths based ONLY on provided factual records.
 
 CRITICAL RULES:

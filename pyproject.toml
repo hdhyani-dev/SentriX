@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "chainbreak"
+name = "sentrix"
 version = "0.1.0"
-description = "Multi-Step Attack Simulation and Risk-Path Analysis Agent"
+description = "SentriX — Multi-Step Attack Simulation and Risk-Path Analysis Agent"
 requires-python = ">=3.11"
 dependencies = [
     "streamlit>=1.30",

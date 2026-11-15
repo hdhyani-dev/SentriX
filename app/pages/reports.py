@@ -34,7 +34,7 @@ def render_reports(lab_id: str | None):
             st.download_button(
                 label=f"📥 Download Report ({fmt.upper()})",
                 data=content,
-                file_name=f"chainbreak_report_{lab_id}.{'html' if fmt == 'html' else 'md'}",
+                file_name=f"sentrix_report_{lab_id}.{'html' if fmt == 'html' else 'md'}",
                 mime="text/html" if fmt == "html" else "text/markdown",
             )
 
