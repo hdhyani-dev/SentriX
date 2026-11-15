@@ -2,15 +2,11 @@
 AI Provider Adapter — selects external LLM or deterministic fallback.
 """
 
-import json
 import logging
-import os
-from typing import Any
 
 from app.config import settings
 from core.ai.base import BaseAIProvider, AIExplanationRequest, AIExplanationResponse
 from core.ai.deterministic_fallback import deterministic_fallback_provider
-from core.ai.prompts import SYSTEM_PROMPT, build_user_prompt
 
 logger = logging.getLogger(__name__)
 

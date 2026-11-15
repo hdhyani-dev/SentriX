@@ -2,7 +2,6 @@
 Asset and service inventory services.
 """
 
-import json
 import logging
 
 from sqlalchemy.orm import Session

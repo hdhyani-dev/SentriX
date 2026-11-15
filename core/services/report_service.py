@@ -8,8 +8,9 @@ from sqlalchemy.orm import Session
 from core.models.enums import EventType
 from core.reporting.markdown_report import markdown_report_generator
 from core.reporting.html_report import html_report_generator
+from core.services.asset_service import service_service
 from database.repositories import (
-    lab_repo, asset_repo, service_repo, finding_repo,
+    lab_repo, asset_repo, finding_repo,
     attack_path_repo, validation_repo, evidence_repo, audit_log_repo
 )
 
@@ -28,9 +29,7 @@ class ReportService:
             raise ValueError(f"Laboratory '{lab_id}' not found.")
 
         assets = asset_repo.get_by_lab(session, lab_id)
-        services = []
-        for a in assets:
-            services.extend(service_repo.get_by_asset(session, a.id))
+        services = service_service.list_services_by_lab(session, lab_id)
         findings = finding_repo.get_by_lab(session, lab_id)
         paths = attack_path_repo.get_by_lab(session, lab_id)
         validations = validation_repo.get_by_lab(session, lab_id)

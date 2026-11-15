@@ -7,8 +7,7 @@ from datetime import datetime
 from sqlalchemy import String, Text, DateTime, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database.base import Base
-from core.models.lab import _new_id, _utcnow
+from database.base import Base, _new_id, _utcnow
 
 
 class Validation(Base):

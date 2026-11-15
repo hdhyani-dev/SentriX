@@ -5,7 +5,6 @@ Each repository provides CRUD operations for a specific entity type.
 All repositories accept a SQLAlchemy session and do not manage transactions.
 """
 
-import json
 from typing import TypeVar, Generic, Type
 from sqlalchemy.orm import Session
 

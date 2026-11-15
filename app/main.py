@@ -43,52 +43,33 @@ else:
 
 st.sidebar.markdown("---")
 
-# Navigation menu
-pages = [
-    "Dashboard",
-    "Lab Management",
-    "Asset & Services",
-    "Security Findings",
-    "Candidate Paths",
-    "Safe Validation",
-    "Evidence Records",
-    "Assessment Report",
-]
+from app.pages.dashboard import render_dashboard
+from app.pages.labs import render_labs
+from app.pages.assets import render_assets
+from app.pages.findings import render_findings
+from app.pages.attack_paths import render_attack_paths
+from app.pages.validation import render_validation
+from app.pages.evidence import render_evidence
+from app.pages.reports import render_reports
 
-choice = st.sidebar.radio("Navigation", pages)
+# Page routing registry
+PAGE_ROUTES = {
+    "Dashboard": render_dashboard,
+    "Lab Management": render_labs,
+    "Asset & Services": render_assets,
+    "Security Findings": render_findings,
+    "Candidate Paths": render_attack_paths,
+    "Safe Validation": render_validation,
+    "Evidence Records": render_evidence,
+    "Assessment Report": render_reports,
+}
+
+choice = st.sidebar.radio("Navigation", list(PAGE_ROUTES.keys()))
 
 st.sidebar.markdown("---")
 st.sidebar.info("⚠️ **Synthetic Simulation**: ChainBreak operates read-only. No offensive actions are executed.")
 
-# Page routing
-if choice == "Dashboard":
-    from app.pages.dashboard import render_dashboard
-    render_dashboard(selected_lab_id)
-
-elif choice == "Lab Management":
-    from app.pages.labs import render_labs
-    render_labs(selected_lab_id)
-
-elif choice == "Asset & Services":
-    from app.pages.assets import render_assets
-    render_assets(selected_lab_id)
-
-elif choice == "Security Findings":
-    from app.pages.findings import render_findings
-    render_findings(selected_lab_id)
-
-elif choice == "Candidate Paths":
-    from app.pages.attack_paths import render_attack_paths
-    render_attack_paths(selected_lab_id)
-
-elif choice == "Safe Validation":
-    from app.pages.validation import render_validation
-    render_validation(selected_lab_id)
-
-elif choice == "Evidence Records":
-    from app.pages.evidence import render_evidence
-    render_evidence(selected_lab_id)
-
-elif choice == "Assessment Report":
-    from app.pages.reports import render_reports
-    render_reports(selected_lab_id)
+# Execute active page renderer
+render_func = PAGE_ROUTES.get(choice)
+if render_func:
+    render_func(selected_lab_id)

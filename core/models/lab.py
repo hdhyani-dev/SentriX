@@ -2,21 +2,12 @@
 SQLAlchemy ORM model for Laboratory.
 """
 
-import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 
 from sqlalchemy import String, Text, DateTime
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from database.base import Base
-
-
-def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def _new_id() -> str:
-    return str(uuid.uuid4())
+from database.base import Base, _new_id, _utcnow
 
 
 class Laboratory(Base):
