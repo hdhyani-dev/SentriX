@@ -79,10 +79,58 @@ class LabService:
             "errors": [],
         }
 
-        # Check for duplicate lab
+        # 1. Check for duplicate lab
         existing = lab_repo.get_by_id(session, validated.lab.id)
         if existing:
             result["errors"].append(f"Lab '{validated.lab.id}' already exists")
+            return result
+
+        # 2. Strict validation of same-lab ownership and referential integrity (zero dangling references)
+        target_lab_id = validated.lab.id
+        asset_ids = {a.id for a in validated.assets}
+        evidence_ids = {e.id for e in validated.evidence}
+        node_ids = set(asset_ids)
+        for s in validated.services:
+            node_ids.add(s.id)
+        for f in validated.findings:
+            node_ids.add(f.id)
+
+        for ev in validated.evidence:
+            if ev.lab_id != target_lab_id:
+                result["errors"].append(f"Evidence '{ev.id}' has mismatched lab_id '{ev.lab_id}' (expected '{target_lab_id}').")
+
+        for a in validated.assets:
+            if a.lab_id != target_lab_id:
+                result["errors"].append(f"Asset '{a.id}' has mismatched lab_id '{a.lab_id}' (expected '{target_lab_id}').")
+
+        for s in validated.services:
+            if s.asset_id not in asset_ids:
+                result["errors"].append(f"Service '{s.id}' references dangling asset_id '{s.asset_id}'.")
+
+        for f in validated.findings:
+            if f.lab_id != target_lab_id:
+                result["errors"].append(f"Finding '{f.id}' has mismatched lab_id '{f.lab_id}' (expected '{target_lab_id}').")
+            if f.asset_id not in asset_ids:
+                result["errors"].append(f"Finding '{f.id}' references dangling asset_id '{f.asset_id}'.")
+            if f.evidence_ids:
+                for feid in f.evidence_ids:
+                    if feid not in evidence_ids:
+                        result["errors"].append(f"Finding '{f.id}' references non-existent evidence_id '{feid}'.")
+
+        for r in validated.relationships:
+            if r.lab_id != target_lab_id:
+                result["errors"].append(f"Relationship '{r.id}' has mismatched lab_id '{r.lab_id}' (expected '{target_lab_id}').")
+            if r.source_node_id not in node_ids:
+                result["errors"].append(f"Relationship '{r.id}' references missing source node '{r.source_node_id}'.")
+            if r.target_node_id not in node_ids:
+                result["errors"].append(f"Relationship '{r.id}' references missing target node '{r.target_node_id}'.")
+            if r.evidence_ids:
+                for reid in r.evidence_ids:
+                    if reid not in evidence_ids:
+                        result["errors"].append(f"Relationship '{r.id}' references non-existent evidence_id '{reid}'.")
+
+        if result["errors"]:
+            logger.warning("Import rejected for lab %s due to %d referential error(s)", target_lab_id, len(result["errors"]))
             return result
 
         # Create lab

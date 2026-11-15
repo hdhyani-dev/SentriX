@@ -8,7 +8,7 @@ import logging
 from typing import Any
 
 from core.models.enums import ScopeDecision
-from core.policy.action_registry import is_action_prohibited
+from core.policy.action_registry import is_action_prohibited, is_action_permitted_in_category
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class ScopePolicyEngine:
     """Evaluates validation requests against laboratory scope policy with fail-closed behavior."""
 
     @staticmethod
-    def evaluate(lab: Any, request: ValidationRequest) -> ScopeDecisionResult:
+    def evaluate(lab: Any, request: ValidationRequest, context: dict[str, Any] | None = None) -> ScopeDecisionResult:
         """Evaluate a validation request against lab policy.
 
         Fails closed on any missing, invalid, or ambiguous condition.
@@ -112,6 +112,56 @@ class ScopePolicyEngine:
                 reason=f"Validation category '{request.validation_category}' is not permitted for this lab.",
                 evaluated_rule="RULE_CATEGORY_ALLOWLIST",
             )
+
+        # Rule 8: Action must belong to the requested validation category
+        if not is_action_permitted_in_category(request.validation_category, request.requested_action):
+            return ScopeDecisionResult(
+                decision=ScopeDecision.BLOCKED,
+                reason=f"Action '{request.requested_action}' is not permitted under category '{request.validation_category}'.",
+                evaluated_rule="RULE_ACTION_CATEGORY_MEMBERSHIP",
+            )
+
+        # Rule 9: Target asset must exist and belong to this laboratory
+        if context and "asset" in context:
+            target_asset = context.get("asset")
+            if not target_asset:
+                return ScopeDecisionResult(
+                    decision=ScopeDecision.BLOCKED,
+                    reason=f"Target asset '{request.target_asset_id}' does not exist in inventory.",
+                    evaluated_rule="RULE_ASSET_EXISTS",
+                )
+            if target_asset.lab_id != lab.id:
+                return ScopeDecisionResult(
+                    decision=ScopeDecision.BLOCKED,
+                    reason=f"Target asset '{request.target_asset_id}' belongs to lab '{target_asset.lab_id}', not active lab '{lab.id}'.",
+                    evaluated_rule="RULE_ASSET_LAB_OWNERSHIP",
+                )
+
+        # Rule 10: Associated finding must belong to this laboratory and the target asset
+        if context and context.get("finding"):
+            finding = context["finding"]
+            if finding.lab_id != lab.id:
+                return ScopeDecisionResult(
+                    decision=ScopeDecision.BLOCKED,
+                    reason=f"Associated finding '{finding.id}' belongs to lab '{finding.lab_id}', not active lab '{lab.id}'.",
+                    evaluated_rule="RULE_FINDING_LAB_OWNERSHIP",
+                )
+            if finding.asset_id != request.target_asset_id:
+                return ScopeDecisionResult(
+                    decision=ScopeDecision.BLOCKED,
+                    reason=f"Associated finding '{finding.id}' is assigned to asset '{finding.asset_id}', not target asset '{request.target_asset_id}'.",
+                    evaluated_rule="RULE_FINDING_ASSET_MISMATCH",
+                )
+
+        # Rule 11: Associated evidence records must belong to this laboratory
+        if context and context.get("evidence_records"):
+            for ev in context["evidence_records"]:
+                if ev.lab_id != lab.id:
+                    return ScopeDecisionResult(
+                        decision=ScopeDecision.BLOCKED,
+                        reason=f"Associated evidence '{ev.id}' belongs to lab '{ev.lab_id}', not active lab '{lab.id}'.",
+                        evaluated_rule="RULE_EVIDENCE_LAB_OWNERSHIP",
+                    )
 
         # All checks passed — allowed
         return ScopeDecisionResult(

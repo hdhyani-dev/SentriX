@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from core.models.enums import EventType, ScopeDecision
 from core.policy.scope_policy import scope_policy_engine, ValidationRequest, ScopeDecisionResult
-from database.repositories import lab_repo, audit_log_repo
+from database.repositories import (
+    lab_repo, asset_repo, finding_repo, evidence_repo, audit_log_repo
+)
 
 logger = logging.getLogger(__name__)
 
@@ -20,9 +22,26 @@ class ScopeService:
         self._engine = scope_policy_engine
 
     def check_scope(self, session: Session, request: ValidationRequest) -> ScopeDecisionResult:
-        """Check whether a validation request is allowed under lab scope."""
+        """Check whether a validation request is allowed under lab scope with referential verification."""
         lab = lab_repo.get_by_id(session, request.lab_id)
-        result = self._engine.evaluate(lab, request)
+
+        # Build referential context for deep same-lab ownership checks
+        asset = asset_repo.get_by_id(session, request.target_asset_id)
+        finding = finding_repo.get_by_id(session, request.finding_id) if request.finding_id else None
+        evidence_records = []
+        if request.evidence_ids:
+            for eid in request.evidence_ids:
+                ev = evidence_repo.get_by_id(session, eid)
+                if ev:
+                    evidence_records.append(ev)
+
+        context = {
+            "asset": asset,
+            "finding": finding,
+            "evidence_records": evidence_records,
+        }
+
+        result = self._engine.evaluate(lab, request, context=context)
 
         # Audit log the decision
         event_type = EventType.VALIDATION_ALLOWED.value if result.is_allowed else EventType.VALIDATION_BLOCKED.value

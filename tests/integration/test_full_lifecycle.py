@@ -19,17 +19,6 @@ from core.ai.base import AIExplanationRequest
 from core.models.enums import ScopeDecision, ValidationResult, PathStatus
 
 
-@pytest.fixture
-def fresh_session():
-    """Create a temporary in-memory SQLite database session for isolated testing."""
-    engine = create_engine("sqlite:///:memory:")
-    Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(bind=engine)
-    session = Session()
-    yield session
-    session.close()
-
-
 def test_full_chainbreak_workflow(fresh_session):
     session = fresh_session
 

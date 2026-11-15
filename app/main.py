@@ -43,25 +43,19 @@ else:
 
 st.sidebar.markdown("---")
 
-from app.pages.dashboard import render_dashboard
-from app.pages.labs import render_labs
-from app.pages.assets import render_assets
-from app.pages.findings import render_findings
-from app.pages.attack_paths import render_attack_paths
-from app.pages.validation import render_validation
-from app.pages.evidence import render_evidence
+from app.pages.path_explorer import render_path_explorer
+from app.pages.overview import render_overview
+from app.pages.lab_inventory import render_lab_inventory
+from app.pages.evidence_validation import render_evidence_validation
 from app.pages.reports import render_reports
 
-# Page routing registry
+# Page routing registry — 5 cohesive sections with Path Explorer as the primary experience
 PAGE_ROUTES = {
-    "Dashboard": render_dashboard,
-    "Lab Management": render_labs,
-    "Asset & Services": render_assets,
-    "Security Findings": render_findings,
-    "Candidate Paths": render_attack_paths,
-    "Safe Validation": render_validation,
-    "Evidence Records": render_evidence,
-    "Assessment Report": render_reports,
+    "Path Explorer": render_path_explorer,
+    "Overview": render_overview,
+    "Lab & Inventory": render_lab_inventory,
+    "Evidence & Validation": render_evidence_validation,
+    "Reports": render_reports,
 }
 
 choice = st.sidebar.radio("Navigation", list(PAGE_ROUTES.keys()))

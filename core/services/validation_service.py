@@ -77,6 +77,21 @@ class ValidationService:
                 evidence_ids_json=json.dumps(eids) if eids else None,
                 validator_module=None,
             )
+            # Only update path status if target asset is actually on the path
+            if attack_path_id:
+                path = attack_path_repo.get_by_id(session, attack_path_id)
+                if path and path.lab_id == lab_id:
+                    path_data = {}
+                    if path.path_data_json:
+                        try:
+                            path_data = json.loads(path.path_data_json)
+                        except Exception:
+                            pass
+                    path_nodes = set(path_data.get("nodes", []))
+                    if target_asset_id in path_nodes:
+                        path.path_status = PathStatus.BLOCKED.value
+                        session.flush()
+
             logger.warning("Validation blocked: %s", scope_res.reason)
             return record
 
@@ -153,15 +168,49 @@ class ValidationService:
             reason=outcome.reason,
         )
 
-        # 6. Update attack path status if specified
+        # 6. Update attack path status if specified and verified to be on the path
         if attack_path_id:
             path = attack_path_repo.get_by_id(session, attack_path_id)
-            if path:
-                if outcome.result == ValidationResult.CONFIRMED:
-                    path.path_status = PathStatus.PARTIALLY_SUPPORTED.value
-                elif outcome.result == ValidationResult.BLOCKED:
-                    path.path_status = PathStatus.BLOCKED.value
-                session.flush()
+            if path and path.lab_id == lab_id:
+                path_data = {}
+                if path.path_data_json:
+                    try:
+                        path_data = json.loads(path.path_data_json)
+                    except Exception:
+                        pass
+
+                path_nodes = set(path_data.get("nodes", []))
+                path_findings = set(path_data.get("findings", []))
+
+                is_asset_on_path = target_asset_id in path_nodes
+                is_finding_on_path = (finding_id in path_findings) if finding_id else False
+
+                if not is_asset_on_path and not is_finding_on_path:
+                    logger.info(
+                        "Validation on asset %s / finding %s is not part of path %s; preserving status '%s'",
+                        target_asset_id, finding_id, attack_path_id, path.path_status,
+                    )
+                else:
+                    if outcome.result == ValidationResult.CONFIRMED:
+                        # Collect all confirmed findings for this lab to check if entire path is verified
+                        lab_validations = validation_repo.get_by_lab(session, lab_id)
+                        confirmed_findings = {
+                            v.finding_id for v in lab_validations
+                            if v.finding_id and v.result == ValidationResult.CONFIRMED.value
+                        }
+                        if finding_id:
+                            confirmed_findings.add(finding_id)
+
+                        # If all findings on the path have confirmed validation -> SUPPORTED
+                        if path_findings and path_findings.issubset(confirmed_findings):
+                            path.path_status = PathStatus.SUPPORTED.value
+                        else:
+                            path.path_status = PathStatus.PARTIALLY_SUPPORTED.value
+                    elif outcome.result == ValidationResult.BLOCKED:
+                        path.path_status = PathStatus.BLOCKED.value
+                    elif outcome.result == ValidationResult.NOT_CONFIRMED:
+                        path.path_status = PathStatus.INCONCLUSIVE.value
+                    session.flush()
 
         logger.info("Validation completed: id=%s result=%s", val_id, outcome.result.value)
         return record

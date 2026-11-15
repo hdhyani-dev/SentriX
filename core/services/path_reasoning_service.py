@@ -44,12 +44,28 @@ class PathReasoningService:
         G = self._builder.build(session, lab_id)
         raw_candidates = self._algorithms.find_candidate_paths(G, max_length=mlen, max_results=mres)
 
+        # Load existing paths for this lab to enable fast fingerprint/title deduplication
+        existing_paths = attack_path_repo.get_by_lab(session, lab_id)
+        existing_fingerprints: dict[str, AttackPath] = {}
+        existing_titles: dict[str, AttackPath] = {}
+        for p in existing_paths:
+            existing_titles[p.title] = p
+            if p.path_data_json:
+                try:
+                    pdata = json.loads(p.path_data_json)
+                    fp = pdata.get("fingerprint")
+                    if fp:
+                        existing_fingerprints[fp] = p
+                except Exception:
+                    pass
+
         created_paths: list[AttackPath] = []
         for cand in raw_candidates:
             nodes = cand["nodes"]
             start_node = nodes[0]
             end_node = nodes[-1]
             findings = cand["findings"]
+            fp = cand.get("fingerprint", "")
             
             # Descriptive title
             start_label = G.nodes[start_node].get("label", start_node)
@@ -62,11 +78,8 @@ class PathReasoningService:
 
             path_data_json = json.dumps(cand)
 
-            # Check if this exact sequence already exists for this lab
-            existing = session.query(AttackPath).filter(
-                AttackPath.lab_id == lab_id,
-                AttackPath.title == title
-            ).first()
+            # Check if this exact sequence already exists for this lab by fingerprint or title
+            existing = existing_fingerprints.get(fp) or existing_titles.get(title)
 
             if not existing:
                 path_obj = attack_path_repo.create(
@@ -81,6 +94,9 @@ class PathReasoningService:
                     path_data_json=path_data_json,
                 )
                 created_paths.append(path_obj)
+                if fp:
+                    existing_fingerprints[fp] = path_obj
+                existing_titles[title] = path_obj
             else:
                 created_paths.append(existing)
 

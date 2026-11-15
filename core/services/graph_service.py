@@ -21,8 +21,8 @@ class GraphService:
         self._algorithms = graph_algorithms
         self._serializer = graph_serializer
 
-    def build_graph(self, session: Session, lab_id: str, max_nodes: int = 1000) -> nx.DiGraph:
-        """Construct the NetworkX DiGraph for a given lab."""
+    def build_graph(self, session: Session, lab_id: str, max_nodes: int = 1000) -> nx.DiGraph | nx.MultiDiGraph:
+        """Construct the NetworkX graph for a given lab."""
         G = self._builder.build(session, lab_id, max_nodes=max_nodes)
         audit_log_repo.create(
             session,
@@ -33,6 +33,16 @@ class GraphService:
             reason=f"Graph built with {G.number_of_nodes()} nodes and {G.number_of_edges()} edges.",
         )
         return G
+
+    def get_plotly_figure(
+        self,
+        session: Session,
+        lab_id: str,
+        highlight_path: list[str] | None = None,
+    ) -> Any:
+        """Generate interactive Plotly visualization for the lab graph."""
+        G = self.build_graph(session, lab_id)
+        return self._serializer.create_network_plotly_figure(G, highlight_path=highlight_path)
 
     def get_graph_stats(self, session: Session, lab_id: str) -> dict[str, Any]:
         """Build and calculate stats for a lab's graph."""

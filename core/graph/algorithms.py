@@ -4,15 +4,11 @@ Graph algorithms — bounded path finding, neighbor queries, component analysis.
 All algorithms are deterministic and handle cycles/disconnected components safely.
 """
 
+import hashlib
 import logging
 import sys
 from pathlib import Path
 from typing import Any
-
-# Ensure project root is in sys.path when executed directly
-_project_root = Path(__file__).resolve().parent.parent.parent
-if str(_project_root) not in sys.path:
-    sys.path.insert(0, str(_project_root))
 
 import networkx as nx
 
@@ -22,29 +18,38 @@ logger = logging.getLogger(__name__)
 
 
 class GraphAlgorithms:
-    """Deterministic graph analysis algorithms for ChainBreak."""
+    """Deterministic graph analysis algorithms for SentriX supporting DiGraph and MultiDiGraph."""
+
+    @staticmethod
+    def compute_fingerprint(nodes: list[str], edges: list[dict[str, Any]]) -> str:
+        """Compute a stable, deterministic cryptographic fingerprint for a candidate path."""
+        parts = [":".join(nodes)]
+        for e in edges:
+            parts.append(f"{e.get('source')}->{e.get('target')}:{e.get('relationship_type')}")
+        return hashlib.sha256("|".join(parts).encode("utf-8")).hexdigest()[:16]
 
     def find_candidate_paths(
         self,
-        G: nx.DiGraph,
+        G: nx.DiGraph | nx.MultiDiGraph,
         max_length: int = 6,
         max_results: int = 50,
     ) -> list[dict[str, Any]]:
-        """Find candidate risk paths through the graph.
+        """Find candidate risk paths through the graph using bounded lazy generator iteration.
 
         A candidate path is an ordered sequence of nodes where:
         1. The path starts at an asset node.
         2. The path terminates at an asset node or a finding node.
-        3. The path has length >= 2 (at least 2 edges).
-        4. Associated findings on all traversed assets are identified and attached.
+        3. The path has length >= 2 (at least 2 edges, sequence of >= 3 nodes).
+        4. Associated findings on traversed assets or path nodes are identified.
+        5. Execution is bounded by max_length and max_results without eager in-memory path expansion.
 
         Args:
-            G: The lab graph.
+            G: The lab graph (DiGraph or MultiDiGraph).
             max_length: Maximum number of edges in a path.
             max_results: Maximum number of candidate paths to return.
 
         Returns:
-            List of candidate path dicts.
+            List of candidate path dicts with stable fingerprints.
         """
         candidates: list[dict[str, Any]] = []
 
@@ -60,9 +65,11 @@ class GraphAlgorithms:
             if d.get("node_type") in (NodeType.ASSET.value, NodeType.FINDING.value)
         ]
 
-        visited_paths: set[tuple] = set()
+        visited_fingerprints: set[str] = set()
 
         for source in asset_nodes:
+            if len(candidates) >= max_results:
+                break
             for target in target_nodes:
                 if source == target:
                     continue
@@ -70,58 +77,55 @@ class GraphAlgorithms:
                     break
 
                 try:
-                    paths = list(nx.all_simple_paths(
-                        G, source, target, cutoff=max_length
-                    ))
+                    # Bounded generator iteration (lazy evaluation)
+                    path_generator = nx.all_simple_paths(G, source, target, cutoff=max_length)
+                    for path in path_generator:
+                        if len(candidates) >= max_results:
+                            break
+
+                        # Must have at least 2 edges (>= 3 nodes)
+                        if len(path) < 3:
+                            continue
+
+                        # Collect finding nodes in path OR directly attached to traversed assets
+                        finding_nodes = [
+                            n for n in path
+                            if G.nodes[n].get("node_type") == NodeType.FINDING.value
+                        ]
+                        # Also look at findings attached to assets on the path
+                        for node in path:
+                            if G.nodes[node].get("node_type") == NodeType.ASSET.value:
+                                for succ in G.successors(node):
+                                    if G.nodes[succ].get("node_type") == NodeType.FINDING.value:
+                                        if succ not in finding_nodes:
+                                            finding_nodes.append(succ)
+
+                        if not finding_nodes:
+                            continue
+
+                        candidate = self._build_candidate(G, path, finding_nodes)
+                        fp = candidate["fingerprint"]
+                        if fp in visited_fingerprints:
+                            continue
+                        visited_fingerprints.add(fp)
+
+                        candidates.append(candidate)
                 except (nx.NetworkXError, nx.NodeNotFound):
                     continue
 
-                for path in paths:
-                    if len(candidates) >= max_results:
-                        break
-
-                    path_key = tuple(path)
-                    if path_key in visited_paths:
-                        continue
-                    visited_paths.add(path_key)
-
-                    # Must have at least 2 edges
-                    if len(path) < 3:
-                        continue
-
-                    # Collect finding nodes in path OR directly attached to traversed assets
-                    finding_nodes = [
-                        n for n in path
-                        if G.nodes[n].get("node_type") == NodeType.FINDING.value
-                    ]
-                    # Also look at findings attached to assets on the path
-                    for node in path:
-                        if G.nodes[node].get("node_type") == NodeType.ASSET.value:
-                            for succ in G.successors(node):
-                                if G.nodes[succ].get("node_type") == NodeType.FINDING.value:
-                                    if succ not in finding_nodes:
-                                        finding_nodes.append(succ)
-
-                    if not finding_nodes:
-                        continue
-
-                    candidate = self._build_candidate(G, path, finding_nodes)
-                    candidates.append(candidate)
-
-            if len(candidates) >= max_results:
-                break
-
-        logger.info("Found %d candidate paths (max_length=%d, max_results=%d)",
-                     len(candidates), max_length, max_results)
+        logger.info(
+            "Found %d candidate paths (max_length=%d, max_results=%d)",
+            len(candidates), max_length, max_results
+        )
         return candidates
 
     def _build_candidate(
         self,
-        G: nx.DiGraph,
+        G: nx.DiGraph | nx.MultiDiGraph,
         path: list[str],
         finding_nodes: list[str],
     ) -> dict[str, Any]:
-        """Build a candidate path data structure from a node sequence."""
+        """Build a candidate path data structure from a node sequence, supporting multi-edges."""
         edges = []
         all_evidence_ids: list[str] = []
         missing_evidence: list[dict] = []
@@ -129,46 +133,83 @@ class GraphAlgorithms:
 
         for i in range(len(path) - 1):
             src, tgt = path[i], path[i + 1]
-            edge_data = G.edges[src, tgt]
-            edge_info = {
-                "source": src,
-                "target": tgt,
-                "relationship_id": edge_data.get("relationship_id"),
-                "relationship_type": edge_data.get("relationship_type"),
-                "evidence_status": edge_data.get("evidence_status"),
-                "description": edge_data.get("description"),
-            }
-            edges.append(edge_info)
+            raw_edge_data = G.get_edge_data(src, tgt) or {}
 
-            # Collect evidence
-            ev_ids = edge_data.get("evidence_ids", [])
-            all_evidence_ids.extend(ev_ids)
+            # Handle MultiDiGraph (dict of edge_key -> attr_dict) vs DiGraph (attr_dict)
+            if isinstance(G, nx.MultiDiGraph):
+                for edge_key, edge_attrs in raw_edge_data.items():
+                    edge_info = {
+                        "source": src,
+                        "target": tgt,
+                        "relationship_id": edge_attrs.get("relationship_id", edge_key),
+                        "relationship_type": edge_attrs.get("relationship_type", "relates_to"),
+                        "evidence_status": edge_attrs.get("evidence_status", "observed"),
+                        "description": edge_attrs.get("description"),
+                        "confidence_rationale": edge_attrs.get("confidence_rationale"),
+                    }
+                    edges.append(edge_info)
 
-            # Track missing and inferred evidence
-            status = edge_data.get("evidence_status", "")
-            if status == EvidenceStatus.MISSING.value:
-                missing_evidence.append({
-                    "edge": f"{src} -> {tgt}",
-                    "relationship_type": edge_data.get("relationship_type"),
-                    "note": "Evidence for this relationship is missing",
-                })
-            elif status == EvidenceStatus.INFERRED.value:
-                assumptions.append({
-                    "edge": f"{src} -> {tgt}",
-                    "relationship_type": edge_data.get("relationship_type"),
-                    "rationale": edge_data.get("confidence_rationale", "No rationale provided"),
-                })
+                    # Collect evidence
+                    ev_ids = edge_attrs.get("evidence_ids", [])
+                    all_evidence_ids.extend(ev_ids)
+
+                    # Track missing and inferred evidence
+                    status = edge_attrs.get("evidence_status", "")
+                    if status == EvidenceStatus.MISSING.value:
+                        missing_evidence.append({
+                            "edge": f"{src} -> {tgt}",
+                            "relationship_type": edge_attrs.get("relationship_type"),
+                            "note": "Evidence for this relationship is missing",
+                        })
+                    elif status == EvidenceStatus.INFERRED.value:
+                        assumptions.append({
+                            "edge": f"{src} -> {tgt}",
+                            "relationship_type": edge_attrs.get("relationship_type"),
+                            "rationale": edge_attrs.get("confidence_rationale", "No rationale provided"),
+                        })
+            else:
+                edge_attrs = raw_edge_data
+                edge_info = {
+                    "source": src,
+                    "target": tgt,
+                    "relationship_id": edge_attrs.get("relationship_id"),
+                    "relationship_type": edge_attrs.get("relationship_type", "relates_to"),
+                    "evidence_status": edge_attrs.get("evidence_status", "observed"),
+                    "description": edge_attrs.get("description"),
+                    "confidence_rationale": edge_attrs.get("confidence_rationale"),
+                }
+                edges.append(edge_info)
+
+                ev_ids = edge_attrs.get("evidence_ids", [])
+                all_evidence_ids.extend(ev_ids)
+
+                status = edge_attrs.get("evidence_status", "")
+                if status == EvidenceStatus.MISSING.value:
+                    missing_evidence.append({
+                        "edge": f"{src} -> {tgt}",
+                        "relationship_type": edge_attrs.get("relationship_type"),
+                        "note": "Evidence for this relationship is missing",
+                    })
+                elif status == EvidenceStatus.INFERRED.value:
+                    assumptions.append({
+                        "edge": f"{src} -> {tgt}",
+                        "relationship_type": edge_attrs.get("relationship_type"),
+                        "rationale": edge_attrs.get("confidence_rationale", "No rationale provided"),
+                    })
+
+        fingerprint = self.compute_fingerprint(path, edges)
 
         return {
+            "fingerprint": fingerprint,
             "nodes": path,
             "edges": edges,
             "findings": finding_nodes,
-            "evidence_ids": list(set(all_evidence_ids)),
+            "evidence_ids": sorted(list(set(all_evidence_ids))),
             "missing_evidence": missing_evidence,
             "assumptions": assumptions,
         }
 
-    def get_neighbors(self, G: nx.DiGraph, node_id: str) -> dict[str, list[str]]:
+    def get_neighbors(self, G: nx.DiGraph | nx.MultiDiGraph, node_id: str) -> dict[str, list[str]]:
         """Get predecessors and successors of a node."""
         if node_id not in G:
             return {"predecessors": [], "successors": []}
@@ -177,31 +218,44 @@ class GraphAlgorithms:
             "successors": list(G.successors(node_id)),
         }
 
-    def get_connected_components(self, G: nx.DiGraph) -> list[set[str]]:
+    def get_connected_components(self, G: nx.DiGraph | nx.MultiDiGraph) -> list[set[str]]:
         """Get weakly connected components of the directed graph."""
         return [set(c) for c in nx.weakly_connected_components(G)]
 
-    def get_disconnected_nodes(self, G: nx.DiGraph) -> list[str]:
+    def get_disconnected_nodes(self, G: nx.DiGraph | nx.MultiDiGraph) -> list[str]:
         """Get nodes with no edges."""
         return [n for n in G.nodes() if G.degree(n) == 0]
 
-    def get_node_details(self, G: nx.DiGraph, node_id: str) -> dict[str, Any] | None:
-        """Get full details of a node including its edges."""
+    def get_node_details(self, G: nx.DiGraph | nx.MultiDiGraph, node_id: str) -> dict[str, Any] | None:
+        """Get full details of a node including all incoming and outgoing edges."""
         if node_id not in G:
             return None
         data = dict(G.nodes[node_id])
         data["id"] = node_id
-        data["in_edges"] = [
-            {"source": u, **dict(G.edges[u, node_id])}
-            for u in G.predecessors(node_id)
-        ]
-        data["out_edges"] = [
-            {"target": v, **dict(G.edges[node_id, v])}
-            for v in G.successors(node_id)
-        ]
+
+        in_edges = []
+        for u in G.predecessors(node_id):
+            ed = G.get_edge_data(u, node_id) or {}
+            if isinstance(G, nx.MultiDiGraph):
+                for k, attrs in ed.items():
+                    in_edges.append({"source": u, "edge_key": k, **attrs})
+            else:
+                in_edges.append({"source": u, **ed})
+
+        out_edges = []
+        for v in G.successors(node_id):
+            ed = G.get_edge_data(node_id, v) or {}
+            if isinstance(G, nx.MultiDiGraph):
+                for k, attrs in ed.items():
+                    out_edges.append({"target": v, "edge_key": k, **attrs})
+            else:
+                out_edges.append({"target": v, **ed})
+
+        data["in_edges"] = in_edges
+        data["out_edges"] = out_edges
         return data
 
-    def get_path_details(self, G: nx.DiGraph, node_ids: list[str]) -> dict[str, Any] | None:
+    def get_path_details(self, G: nx.DiGraph | nx.MultiDiGraph, node_ids: list[str]) -> dict[str, Any] | None:
         """Get details of a specific path given an ordered list of node IDs."""
         if not node_ids or len(node_ids) < 2:
             return None
@@ -217,7 +271,7 @@ class GraphAlgorithms:
         ]
         return self._build_candidate(G, node_ids, finding_nodes)
 
-    def graph_stats(self, G: nx.DiGraph) -> dict[str, Any]:
+    def graph_stats(self, G: nx.DiGraph | nx.MultiDiGraph) -> dict[str, Any]:
         """Get summary statistics for a graph."""
         components = self.get_connected_components(G)
         node_types: dict[str, int] = {}

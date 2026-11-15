@@ -26,8 +26,8 @@ logger = logging.getLogger(__name__)
 class GraphBuilder:
     """Builds a NetworkX directed graph from persisted lab records."""
 
-    def build(self, session: Session, lab_id: str, max_nodes: int = 1000) -> nx.DiGraph:
-        """Build a complete graph for a lab.
+    def build(self, session: Session, lab_id: str, max_nodes: int = 1000) -> nx.MultiDiGraph:
+        """Build a complete graph for a lab using MultiDiGraph to preserve parallel edges.
 
         Args:
             session: Database session.
@@ -35,9 +35,9 @@ class GraphBuilder:
             max_nodes: Safety limit on total node count.
 
         Returns:
-            A NetworkX DiGraph with typed nodes and evidence-annotated edges.
+            A NetworkX MultiDiGraph with typed nodes and evidence-annotated edges.
         """
-        G = nx.DiGraph()
+        G = nx.MultiDiGraph()
 
         # Load assets as nodes
         assets = asset_repo.get_by_lab(session, lab_id)
@@ -114,6 +114,7 @@ class GraphBuilder:
             G.add_edge(
                 rel.source_node_id,
                 rel.target_node_id,
+                key=rel.id,
                 relationship_id=rel.id,
                 relationship_type=rel.relationship_type,
                 evidence_status=rel.evidence_status,
