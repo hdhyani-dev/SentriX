@@ -1,0 +1,557 @@
+{
+  "lab": {
+    "id": "lab-001",
+    "name": "ChainBreak Demo Lab",
+    "description": "Synthetic three-machine laboratory for demonstrating ChainBreak risk-path analysis. All data is fabricated for educational purposes.",
+    "scope_policy": {
+      "allowed_asset_ids": ["asset-web", "asset-app", "asset-db"],
+      "allowed_validation_categories": [
+        "prepared_evidence",
+        "configuration_check",
+        "service_inventory_check",
+        "policy_rule_check"
+      ],
+      "prohibited_actions": [
+        "exploit_execution",
+        "credential_extraction",
+        "privilege_escalation",
+        "network_scanning",
+        "lateral_movement",
+        "destructive_testing"
+      ],
+      "validation_enabled": true,
+      "notes": "This is a synthetic demonstration lab. All findings and evidence are fabricated."
+    }
+  },
+  "assets": [
+    {
+      "id": "asset-web",
+      "lab_id": "lab-001",
+      "name": "web-server",
+      "hostname": "web-srv-01",
+      "ip_address": "10.0.1.10",
+      "asset_type": "server",
+      "operating_system": "Ubuntu",
+      "os_version": "22.04 LTS",
+      "description": "Public-facing web server hosting the demo application.",
+      "metadata": {"role": "frontend", "zone": "dmz"}
+    },
+    {
+      "id": "asset-app",
+      "lab_id": "lab-001",
+      "name": "app-server",
+      "hostname": "app-srv-01",
+      "ip_address": "10.0.2.20",
+      "asset_type": "server",
+      "operating_system": "Ubuntu",
+      "os_version": "22.04 LTS",
+      "description": "Internal application server running the backend API.",
+      "metadata": {"role": "backend", "zone": "internal"}
+    },
+    {
+      "id": "asset-db",
+      "lab_id": "lab-001",
+      "name": "database-server",
+      "hostname": "db-srv-01",
+      "ip_address": "10.0.3.30",
+      "asset_type": "database",
+      "operating_system": "Ubuntu",
+      "os_version": "22.04 LTS",
+      "description": "Internal database server storing application data.",
+      "metadata": {"role": "data", "zone": "restricted"}
+    },
+    {
+      "id": "asset-monitor",
+      "lab_id": "lab-001",
+      "name": "monitoring-station",
+      "hostname": "mon-01",
+      "ip_address": "10.0.4.40",
+      "asset_type": "server",
+      "operating_system": "CentOS",
+      "os_version": "8",
+      "description": "Disconnected monitoring station — not part of the main application flow.",
+      "metadata": {"role": "monitoring", "zone": "management"}
+    }
+  ],
+  "services": [
+    {
+      "id": "svc-web-http",
+      "asset_id": "asset-web",
+      "name": "HTTP",
+      "protocol": "TCP",
+      "port": 80,
+      "version": "nginx 1.24.0",
+      "description": "Public HTTP service",
+      "evidence_id": "ev-svc-scan-web"
+    },
+    {
+      "id": "svc-web-https",
+      "asset_id": "asset-web",
+      "name": "HTTPS",
+      "protocol": "TCP",
+      "port": 443,
+      "version": "nginx 1.24.0",
+      "description": "Public HTTPS service",
+      "evidence_id": "ev-svc-scan-web"
+    },
+    {
+      "id": "svc-web-ssh",
+      "asset_id": "asset-web",
+      "name": "SSH",
+      "protocol": "TCP",
+      "port": 22,
+      "version": "OpenSSH 8.9",
+      "description": "SSH remote access",
+      "evidence_id": "ev-svc-scan-web"
+    },
+    {
+      "id": "svc-app-api",
+      "asset_id": "asset-app",
+      "name": "REST API",
+      "protocol": "TCP",
+      "port": 8080,
+      "version": "Flask 3.0",
+      "description": "Internal REST API",
+      "evidence_id": "ev-svc-scan-app"
+    },
+    {
+      "id": "svc-app-ssh",
+      "asset_id": "asset-app",
+      "name": "SSH",
+      "protocol": "TCP",
+      "port": 22,
+      "version": "OpenSSH 8.9",
+      "description": "SSH remote access",
+      "evidence_id": "ev-svc-scan-app"
+    },
+    {
+      "id": "svc-db-mysql",
+      "asset_id": "asset-db",
+      "name": "MySQL",
+      "protocol": "TCP",
+      "port": 3306,
+      "version": "MySQL 8.0.35",
+      "description": "MySQL database service",
+      "evidence_id": "ev-svc-scan-db"
+    },
+    {
+      "id": "svc-db-ssh",
+      "asset_id": "asset-db",
+      "name": "SSH",
+      "protocol": "TCP",
+      "port": 22,
+      "version": "OpenSSH 8.9",
+      "description": "SSH remote access",
+      "evidence_id": "ev-svc-scan-db"
+    }
+  ],
+  "findings": [
+    {
+      "id": "finding-web-tls",
+      "lab_id": "lab-001",
+      "asset_id": "asset-web",
+      "title": "Weak TLS Configuration",
+      "description": "The web server supports TLS 1.0 and 1.1 which are deprecated protocols. This may allow downgrade attacks.",
+      "category": "configuration",
+      "severity": "medium",
+      "external_reference": null,
+      "evidence_ids": ["ev-tls-scan"],
+      "source": "synthetic_scan_report",
+      "status": "open",
+      "remediation": "Disable TLS 1.0 and 1.1. Configure the server to support only TLS 1.2 and TLS 1.3."
+    },
+    {
+      "id": "finding-web-headers",
+      "lab_id": "lab-001",
+      "asset_id": "asset-web",
+      "title": "Missing Security Headers",
+      "description": "The web server response lacks several recommended security headers including X-Content-Type-Options, X-Frame-Options, and Content-Security-Policy.",
+      "category": "configuration",
+      "severity": "low",
+      "external_reference": null,
+      "evidence_ids": ["ev-header-check"],
+      "source": "synthetic_config_review",
+      "status": "open",
+      "remediation": "Add X-Content-Type-Options: nosniff, X-Frame-Options: DENY, and a Content-Security-Policy header."
+    },
+    {
+      "id": "finding-app-perms",
+      "lab_id": "lab-001",
+      "asset_id": "asset-app",
+      "title": "Excessive Application Service Permissions",
+      "description": "The application service runs with root-level permissions. If compromised, an attacker would have full system access on the application server.",
+      "category": "access_control",
+      "severity": "high",
+      "external_reference": null,
+      "evidence_ids": ["ev-app-perms"],
+      "source": "synthetic_config_review",
+      "status": "open",
+      "remediation": "Run the application service under a dedicated, least-privilege user account."
+    },
+    {
+      "id": "finding-app-api-noauth",
+      "lab_id": "lab-001",
+      "asset_id": "asset-app",
+      "title": "Unauthenticated Internal API Endpoint",
+      "description": "The /admin/status endpoint on the application server API does not require authentication. It exposes internal system information.",
+      "category": "access_control",
+      "severity": "medium",
+      "external_reference": null,
+      "evidence_ids": ["ev-api-check"],
+      "source": "synthetic_api_review",
+      "status": "open",
+      "remediation": "Require authentication for all administrative endpoints."
+    },
+    {
+      "id": "finding-db-access",
+      "lab_id": "lab-001",
+      "asset_id": "asset-db",
+      "title": "Database Accessible Without IP Restriction",
+      "description": "The MySQL service is configured to accept connections from any IP address (bind-address=0.0.0.0) rather than restricting to known application servers.",
+      "category": "access_control",
+      "severity": "high",
+      "external_reference": null,
+      "evidence_ids": ["ev-db-config"],
+      "source": "synthetic_config_review",
+      "status": "open",
+      "remediation": "Restrict MySQL bind-address to the application server IP (10.0.2.20) and use firewall rules."
+    },
+    {
+      "id": "finding-db-weak-creds",
+      "lab_id": "lab-001",
+      "asset_id": "asset-db",
+      "title": "Default Database Credentials in Configuration",
+      "description": "Application configuration files reference default/weak database credentials. This is a synthetic finding — no actual credentials were tested.",
+      "category": "credential_management",
+      "severity": "critical",
+      "external_reference": null,
+      "evidence_ids": [],
+      "source": "synthetic_config_review",
+      "status": "open",
+      "remediation": "Use strong, unique database credentials and store them securely using environment variables or a secrets manager."
+    },
+    {
+      "id": "finding-monitor-unrelated",
+      "lab_id": "lab-001",
+      "asset_id": "asset-monitor",
+      "title": "Monitoring Agent Outdated",
+      "description": "The monitoring agent software is several major versions behind. This is an isolated finding unrelated to the main application flow.",
+      "category": "patch_management",
+      "severity": "low",
+      "external_reference": null,
+      "evidence_ids": ["ev-monitor-version"],
+      "source": "synthetic_version_check",
+      "status": "open",
+      "remediation": "Update the monitoring agent to the latest stable version."
+    }
+  ],
+  "relationships": [
+    {
+      "id": "rel-web-hosts-http",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-web",
+      "target_node_id": "svc-web-http",
+      "relationship_type": "exposes_service",
+      "evidence_ids": ["ev-svc-scan-web"],
+      "evidence_status": "observed",
+      "description": "web-server exposes HTTP on port 80",
+      "source": "service_inventory"
+    },
+    {
+      "id": "rel-web-hosts-https",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-web",
+      "target_node_id": "svc-web-https",
+      "relationship_type": "exposes_service",
+      "evidence_ids": ["ev-svc-scan-web"],
+      "evidence_status": "observed",
+      "description": "web-server exposes HTTPS on port 443",
+      "source": "service_inventory"
+    },
+    {
+      "id": "rel-web-affected-tls",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-web",
+      "target_node_id": "finding-web-tls",
+      "relationship_type": "affected_by",
+      "evidence_ids": ["ev-tls-scan"],
+      "evidence_status": "observed",
+      "description": "web-server is affected by weak TLS configuration",
+      "source": "finding_association"
+    },
+    {
+      "id": "rel-web-affected-headers",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-web",
+      "target_node_id": "finding-web-headers",
+      "relationship_type": "affected_by",
+      "evidence_ids": ["ev-header-check"],
+      "evidence_status": "observed",
+      "description": "web-server is affected by missing security headers",
+      "source": "finding_association"
+    },
+    {
+      "id": "rel-web-connects-app",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-web",
+      "target_node_id": "asset-app",
+      "relationship_type": "connects_to",
+      "evidence_ids": ["ev-network-map"],
+      "evidence_status": "observed",
+      "description": "web-server connects to app-server (proxies API requests)",
+      "source": "network_topology"
+    },
+    {
+      "id": "rel-app-hosts-api",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-app",
+      "target_node_id": "svc-app-api",
+      "relationship_type": "exposes_service",
+      "evidence_ids": ["ev-svc-scan-app"],
+      "evidence_status": "observed",
+      "description": "app-server exposes REST API on port 8080",
+      "source": "service_inventory"
+    },
+    {
+      "id": "rel-app-affected-perms",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-app",
+      "target_node_id": "finding-app-perms",
+      "relationship_type": "affected_by",
+      "evidence_ids": ["ev-app-perms"],
+      "evidence_status": "observed",
+      "description": "app-server is affected by excessive permissions",
+      "source": "finding_association"
+    },
+    {
+      "id": "rel-app-affected-noauth",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-app",
+      "target_node_id": "finding-app-api-noauth",
+      "relationship_type": "affected_by",
+      "evidence_ids": ["ev-api-check"],
+      "evidence_status": "observed",
+      "description": "app-server is affected by unauthenticated API endpoint",
+      "source": "finding_association"
+    },
+    {
+      "id": "rel-app-connects-db",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-app",
+      "target_node_id": "asset-db",
+      "relationship_type": "connects_to",
+      "evidence_ids": ["ev-network-map"],
+      "evidence_status": "observed",
+      "description": "app-server connects to database-server for data operations",
+      "source": "network_topology"
+    },
+    {
+      "id": "rel-db-hosts-mysql",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-db",
+      "target_node_id": "svc-db-mysql",
+      "relationship_type": "exposes_service",
+      "evidence_ids": ["ev-svc-scan-db"],
+      "evidence_status": "observed",
+      "description": "database-server exposes MySQL on port 3306",
+      "source": "service_inventory"
+    },
+    {
+      "id": "rel-db-affected-access",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-db",
+      "target_node_id": "finding-db-access",
+      "relationship_type": "affected_by",
+      "evidence_ids": ["ev-db-config"],
+      "evidence_status": "observed",
+      "description": "database-server is affected by unrestricted access configuration",
+      "source": "finding_association"
+    },
+    {
+      "id": "rel-db-affected-creds",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-db",
+      "target_node_id": "finding-db-weak-creds",
+      "relationship_type": "affected_by",
+      "evidence_ids": [],
+      "evidence_status": "missing",
+      "description": "database-server may be affected by default credentials. Evidence for this finding is missing — credential validity has not been verified.",
+      "confidence_rationale": "Configuration file references default credentials, but no verification has been performed.",
+      "source": "finding_association"
+    },
+    {
+      "id": "rel-app-has-db-perm",
+      "lab_id": "lab-001",
+      "source_node_id": "asset-app",
+      "target_node_id": "asset-db",
+      "relationship_type": "has_permission",
+      "evidence_ids": ["ev-app-perms"],
+      "evidence_status": "inferred",
+      "description": "app-server has inferred database access permission due to running with root privileges",
+      "confidence_rationale": "Inferred from the combination of root-level app service and unrestricted database bind address.",
+      "source": "rule_inference"
+    }
+  ],
+  "evidence": [
+    {
+      "id": "ev-svc-scan-web",
+      "lab_id": "lab-001",
+      "evidence_type": "service_scan",
+      "source": "synthetic_nmap_output.txt",
+      "description": "Synthetic service scan results for web-server (10.0.1.10)",
+      "content": {
+        "scan_type": "synthetic",
+        "target": "10.0.1.10",
+        "ports": [
+          {"port": 22, "state": "open", "service": "ssh", "version": "OpenSSH 8.9"},
+          {"port": 80, "state": "open", "service": "http", "version": "nginx 1.24.0"},
+          {"port": 443, "state": "open", "service": "https", "version": "nginx 1.24.0"}
+        ]
+      },
+      "related_asset_id": "asset-web"
+    },
+    {
+      "id": "ev-svc-scan-app",
+      "lab_id": "lab-001",
+      "evidence_type": "service_scan",
+      "source": "synthetic_nmap_output.txt",
+      "description": "Synthetic service scan results for app-server (10.0.2.20)",
+      "content": {
+        "scan_type": "synthetic",
+        "target": "10.0.2.20",
+        "ports": [
+          {"port": 22, "state": "open", "service": "ssh", "version": "OpenSSH 8.9"},
+          {"port": 8080, "state": "open", "service": "http", "version": "Flask 3.0"}
+        ]
+      },
+      "related_asset_id": "asset-app"
+    },
+    {
+      "id": "ev-svc-scan-db",
+      "lab_id": "lab-001",
+      "evidence_type": "service_scan",
+      "source": "synthetic_nmap_output.txt",
+      "description": "Synthetic service scan results for database-server (10.0.3.30)",
+      "content": {
+        "scan_type": "synthetic",
+        "target": "10.0.3.30",
+        "ports": [
+          {"port": 22, "state": "open", "service": "ssh", "version": "OpenSSH 8.9"},
+          {"port": 3306, "state": "open", "service": "mysql", "version": "MySQL 8.0.35"}
+        ]
+      },
+      "related_asset_id": "asset-db"
+    },
+    {
+      "id": "ev-tls-scan",
+      "lab_id": "lab-001",
+      "evidence_type": "configuration_check",
+      "source": "synthetic_tls_audit.txt",
+      "description": "Synthetic TLS configuration audit showing deprecated protocol support",
+      "content": {
+        "check_type": "tls_version",
+        "target": "10.0.1.10:443",
+        "supported_protocols": ["TLSv1.0", "TLSv1.1", "TLSv1.2", "TLSv1.3"],
+        "deprecated": ["TLSv1.0", "TLSv1.1"],
+        "result": "weak_configuration"
+      },
+      "related_asset_id": "asset-web",
+      "related_finding_id": "finding-web-tls"
+    },
+    {
+      "id": "ev-header-check",
+      "lab_id": "lab-001",
+      "evidence_type": "configuration_check",
+      "source": "synthetic_header_check.txt",
+      "description": "Synthetic HTTP security header check",
+      "content": {
+        "check_type": "http_headers",
+        "target": "10.0.1.10:443",
+        "missing_headers": ["X-Content-Type-Options", "X-Frame-Options", "Content-Security-Policy"],
+        "present_headers": ["Server", "Date", "Content-Type"]
+      },
+      "related_asset_id": "asset-web",
+      "related_finding_id": "finding-web-headers"
+    },
+    {
+      "id": "ev-app-perms",
+      "lab_id": "lab-001",
+      "evidence_type": "configuration_review",
+      "source": "synthetic_ps_output.txt",
+      "description": "Synthetic process listing showing application running as root",
+      "content": {
+        "check_type": "process_permissions",
+        "target": "app-srv-01",
+        "process": "flask_app",
+        "user": "root",
+        "finding": "Application service runs with root-level permissions"
+      },
+      "related_asset_id": "asset-app",
+      "related_finding_id": "finding-app-perms"
+    },
+    {
+      "id": "ev-api-check",
+      "lab_id": "lab-001",
+      "evidence_type": "configuration_check",
+      "source": "synthetic_api_test.txt",
+      "description": "Synthetic API endpoint access check",
+      "content": {
+        "check_type": "api_authentication",
+        "target": "10.0.2.20:8080/admin/status",
+        "method": "GET",
+        "status_code": 200,
+        "auth_required": false,
+        "finding": "Endpoint returns data without authentication"
+      },
+      "related_asset_id": "asset-app",
+      "related_finding_id": "finding-app-api-noauth"
+    },
+    {
+      "id": "ev-db-config",
+      "lab_id": "lab-001",
+      "evidence_type": "configuration_review",
+      "source": "synthetic_mysql_config.txt",
+      "description": "Synthetic MySQL configuration review",
+      "content": {
+        "check_type": "database_config",
+        "target": "db-srv-01",
+        "bind_address": "0.0.0.0",
+        "skip_networking": false,
+        "finding": "MySQL accepts connections from any IP address"
+      },
+      "related_asset_id": "asset-db",
+      "related_finding_id": "finding-db-access"
+    },
+    {
+      "id": "ev-network-map",
+      "lab_id": "lab-001",
+      "evidence_type": "network_topology",
+      "source": "synthetic_network_diagram.txt",
+      "description": "Synthetic network topology showing connectivity between lab assets",
+      "content": {
+        "topology_type": "synthetic",
+        "connections": [
+          {"from": "10.0.1.10", "to": "10.0.2.20", "ports": [8080], "description": "Web proxies to App API"},
+          {"from": "10.0.2.20", "to": "10.0.3.30", "ports": [3306], "description": "App connects to DB"}
+        ]
+      }
+    },
+    {
+      "id": "ev-monitor-version",
+      "lab_id": "lab-001",
+      "evidence_type": "version_check",
+      "source": "synthetic_version_output.txt",
+      "description": "Synthetic monitoring agent version check",
+      "content": {
+        "check_type": "software_version",
+        "target": "mon-01",
+        "software": "monitoring_agent",
+        "installed_version": "2.1.0",
+        "latest_version": "5.3.2",
+        "outdated": true
+      },
+      "related_asset_id": "asset-monitor",
+      "related_finding_id": "finding-monitor-unrelated"
+    }
+  ]
+}
