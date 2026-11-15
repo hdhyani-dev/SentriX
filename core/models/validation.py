@@ -29,5 +29,10 @@ class Validation(Base):
     # Relationships
     lab = relationship("Laboratory", back_populates="validations")
 
+    @property
+    def executed_at(self) -> datetime:
+        """Alias for created_at timestamp to ensure backward compatibility."""
+        return self.created_at
+
     def __repr__(self) -> str:
         return f"<Validation(id={self.id!r}, result={self.result}, decision={self.scope_decision})>"
